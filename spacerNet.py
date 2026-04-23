@@ -378,49 +378,95 @@ def build_network(
     return G, edges
 
 if __name__ == "__main__":
-    if len(sys.argv) < 3 or len(sys.argv) > 4:
-        print("Usage: python spacerNet.py <input_file> <output_file>")
-        sys.exit(1)
+    import argparse
 
-    # ---------- Parameters ----------
-    input_file = sys.argv[1]
-    general_output = sys.argv[2]
-    min_spacers = input("Enter minimum number of spacers needed for a valid array (default 1): ")
-    min_spacers = int(min_spacers) if min_spacers else 1
+    parser = argparse.ArgumentParser(
+        description="Build spacer-sharing networks from CRISPR GFF files"
+    )
+
+    # ---------- Required args ----------
+    parser.add_argument(
+        "input_file",
+        help="Input GFF file containing CRISPR arrays", 
+        
+    )
+    parser.add_argument(
+        "output_prefix",
+        help="Prefix for all output files"
+    )
+
+    # ---------- Optional ars ----------
+    parser.add_argument(
+        "--min_spacers",
+        type=int,
+        default=1,
+        help="Minimum number of spacers required for a valid array (default: 1)"
+    )
+
+    parser.add_argument(
+        "--blast_perc_id",
+        type=float,
+        default=50,
+        help="Percent identity threshold for BLAST (default: 50)"
+    )
+
+    parser.add_argument(
+        "--net_perc_id",
+        type=float,
+        default=95,
+        help="Percent identity threshold for network filtering (default: 95)"
+    )
+
+    parser.add_argument(
+        "--node_color_mode",
+        choices=["species", "strain"],
+        default="species",
+        help="Color nodes by species or strain (default: species)"
+    )
+
+    parser.add_argument(
+        "--remove_singletons",
+        action="store_true",
+        help="Remove singleton edges (weight = 1)"
+    )
+
+    parser.add_argument(
+        "--net_min_length",
+        type=int,
+        default=20,
+        help="Minimum alignment length for network edges (default: 20)"
+    )
+
+    args = parser.parse_args()
 
     # ---------- Extract spacers to FASTA ----------
-    fasta_output_file = general_output + "_spacers.fasta"
-    gff_to_fasta(input_file, fasta_output_file, min_spacers)
+    fasta_output_file = args.output_prefix + "_spacers.fasta"
+    gff_to_fasta(args.input_file, fasta_output_file, args.min_spacers)
     print(f"Spacer FASTA file created: {fasta_output_file}.")
-    print('-'*50)
+    print('-' * 50)
 
     # ---------- Run BLAST ----------
-    blast_perc_id = input("Enter BLAST percent identity threshold (default 95): ")
-    blast_perc_id = float(blast_perc_id) if blast_perc_id else 95
-    blast_df = run_blast(fasta_output_file, blast_perc_id, general_output)
-    blast_df.to_csv(f"{general_output}_blast.csv", index=False)
-    print(f"BLAST completed and results saved to {general_output}_blast.csv")
-    print('-'*50)
+    blast_df = run_blast(fasta_output_file, args.blast_perc_id, args.output_prefix)
+    blast_df.to_csv(f"{args.output_prefix}_blast.csv", index=False)
+    print(f"BLAST completed and results saved to {args.output_prefix}_blast.csv")
+    print('-' * 50)
 
     # ---------- Build network ----------
-    net_perc_id = input("Enter percent identity threshold for network (default 95): ")
-    net_perc_id = float(net_perc_id) if net_perc_id else 95
-    node_color_mode = input("Color nodes by 'species' or 'strain'? (default 'species'): ")
-    node_color_mode = node_color_mode if node_color_mode in ['species', 'strain'] else 'species'
     G, edges = build_network(
         blast_df,
-        net_perc_identity=net_perc_id,
-        min_length=20,
-        remove_singletons=True,
-        save_edges=f"{general_output}_edges.csv",
-        output_figure=f"{general_output}_network.png", 
-        node_color_mode=node_color_mode, 
-        color_map=None
+        net_perc_id=args.net_perc_id,
+        min_length=args.net_min_length,
+        remove_singletons=args.remove_singletons,
+        save_edges=f"{args.output_prefix}_edges.csv",
+        output_figure=f"{args.output_prefix}_network.png",
+        node_color_mode=args.node_color_mode,
+        color_map = None  # can be set for custom color dictionary
     )
-    print(f"Network built and figure saved to {general_output}_network.png")
-    print(f"Edges saved to {general_output}_edges.csv")
+
+    print(f"Network built and figure saved to {args.output_prefix}_network.png")
+    print(f"Edges saved to {args.output_prefix}_edges.csv")
     print('**DONE**')
-    print('-'*50)
+    print('-' * 50)
 
 
 
