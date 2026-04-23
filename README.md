@@ -1,5 +1,5 @@
 # spacerNet
-spacerNet is a tool designed to identify and visualize the shared spacer elements between the CRISPRs of multiple bacterial strains.
+**spacerNet** is a tool designed to identify and visualize the shared spacer elements between the CRISPRs of multiple bacterial strains.
 
 ### Input File:
 > spacerNet requires a combined multi-strain (or species) .GFF file containing CRISPR arrays annotated by CRISPRCasFinder.
@@ -12,10 +12,45 @@ spacerNet is a tool designed to identify and visualize the shared spacer element
 > > ex. ##gff-version 3; 2 CRISPR(s); strain: **Pbon_393_1**
 
 ### Command Format
-Minimal command format
-> `python spacerNet.py input_file output_prefix`
-> > The `output_prefix` is the prefix used to generate the output file names (eg. "paraburk" -> paraburk_spacers.fasta ect.)
+**Minimal command format:**
 
+`python spacerNet.py input_file output_prefix`
+> The `output_prefix` is the prefix used to generate the output file names (eg. "paraburk" -> paraburk_spacers.fasta ect.)
+
+**Optional Flags:**
+
+`--min_spacers` 
+  - type: int 
+  - usage: Specifies the minimum number of spacers required for an array to be considered valid and included in the BLAST/network. 
+  - default: 1 (all detected spaceres included)
+
+`--net_perc_id`
+  - type: int
+  - usage: Percent identity threshold for spacers to be considered 'shared' in network
+  - default: 95 (High sequence similarity required for spacers to be considered homologous)
+
+`--blast_perc_id`
+  - type: int
+  - usage: Percent identity threshold for all-against-all spacer BLAST
+  - default: 50 (Highly permissable spacer hits)
+
+`--node_color_mode`
+  - type: string 
+  - options: 'species' or 'strain'
+  - default: 'species'
+  - usage: specifes the coloring scheme for network nodes. 'species' mode colors nodes based on the speciesTag portion of the .gff strain header. 'strain' mode will give a unique node color to every unique speciesTag_strainID .gff strain header.
+
+`--remove_singletons"`
+  - usage: Including this flag will remove all singleton edges (weight = 1) and any resulting isolated nodes.
+
+`--net_min_length`
+  - type: int
+  - default: 20 (Minimum 20bp BLAST hit length) 
+  - usage: specifices the minumium length required for a spacer BLAST hit to be included in the spacer sharing network
+
+### References: 
+- CRISPRCasFinder : an update of CRISRFinder, includes a portable version, enhanced performance and integrates search for Cas proteins. Nucleic Acids Res. 2018
+- Aric A. Hagberg, Daniel A. Schult and Pieter J. Swart, “Exploring network structure, dynamics, and function using NetworkX”, in Proceedings of the 7th Python in Science Conference (SciPy2008), Gäel Varoquaux, Travis Vaught, and Jarrod Millman (Eds), (Pasadena, CA USA), pp. 11–15, Aug 2008
 
 
 
