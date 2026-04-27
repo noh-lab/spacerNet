@@ -267,9 +267,9 @@ def build_network(
     
     df = blast_df.copy()
     df = df[
-    (df["length"] >= min_length) & 
-    (df["pident"] >= net_perc_id &
-    (df["qseqid"] != df["sseqid"]))
+    (df["length"] >= min_length) &
+    (df["pident"] >= net_perc_id) &
+    (df["qseqid"] != df["sseqid"])
     ]
     print(f"Number of hits after filtering: {len(df)}")
 
