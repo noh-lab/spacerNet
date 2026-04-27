@@ -40,13 +40,34 @@
   - default: 'species'
   - usage: specifes the coloring scheme for network nodes. 'species' mode colors nodes based on the speciesTag portion of the .gff strain header. 'strain' mode will give a unique node color to every unique speciesTag_strainID .gff strain header.
 
-`--remove_singletons"`
-  - usage: Including this flag will remove all singleton edges (weight = 1) and any resulting isolated nodes.
+`--min_edge_weight`
+  - type: int
+  - usage: Specifies the minimum number of shared spacers needed to retain an edge
+  - default: 1 (all edges retained)
+
+`--remove_singletons`
+  - usage: Including this flag will remove all isolated nodes (nodes without edges) after filtering.
 
 `--net_min_length`
   - type: int
-  - default: 20 (Minimum 20bp BLAST hit length) 
   - usage: specifices the minumium length required for a spacer BLAST hit to be included in the spacer sharing network
+  - default: 20 (Minimum 20bp BLAST hit length) 
+
+`--network_mode`
+  - usage: including this flag will bypass the spacer extraction and BLAST in order to only perform the network creation. When this flag is used, pre-run BLAST results must be used as the `input_file`
+
+`--legend_labels`
+  - type: str
+  - usage: Allows for the use of a .csv file containing species/strain mappings to construct the network legend. The mapping file must be specified using the file path. The file must contain the columns prefix,label.
+
+`--layout_k`
+  - type: float
+  - usage: Specifies the k value for the network visualization. K value determines the spacing between nodes (larger K (>1.5)-> more spacing/larger clusters , smaller K (<1.5 -> less spacing/tighter clusters)
+  - default: 2.0
+
+### Example Network:
+<img width="5573" height="5332" alt="spacerNet_bb_bh_network" src="https://github.com/user-attachments/assets/599bc674-2c06-4225-90ad-001331ecd7eb" />
+
 
 ### References: 
 - CRISPRCasFinder : an update of CRISRFinder, includes a portable version, enhanced performance and integrates search for Cas proteins. Nucleic Acids Res. 2018
