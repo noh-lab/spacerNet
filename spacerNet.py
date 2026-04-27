@@ -25,6 +25,7 @@ strain headers of the format "speciesTag_strainID_int" and CRISPR array features
 """
 import sys
 import re
+import pandas as pd
 
 def gff_to_fasta(input_file, spacer_output_file, min_spacers=1):
     """
@@ -175,14 +176,16 @@ def run_blast(spacer_fasta, blast_perc_id, out_prefix):
 
 def build_network(
     blast_df,
-    net_perc_identity=95,
-    min_length=20,
+    net_perc_id,
+    min_length,
     remove_singletons=False,
+    min_edge_weight=1,
     save_edges=None,
-    output_figure=None,
+    output_figure=None,     
     strain_parser=None,
     color_map=None,
     node_color_mode= 'species', # 'species' or 'strain'
+    legend_labels=None,
     title="Spacer Sharing Network",
     figsize=(10, 9),
     layout_k=2.0,
@@ -202,8 +205,11 @@ def build_network(
     min_length : int
         Minimum alignment length
 
+    min_edge_weight : int
+        Minimum shared spacers required to retain an edge (default: 1)
+
     remove_singletons : bool
-        If True, removes edges with weight = 1 and resulting isolated nodes
+        If True, removes nodes with no edges after filtering (default: False)
 
     save_edges : str or None
         Path to save edge table CSV
@@ -219,6 +225,12 @@ def build_network(
 
     node_color_mode : str
         'species' to color by species prefix, 'strain' to color by full strain ID
+
+    legend_labels : str or None
+        Optional CSV file mapping species prefixes to display labels (columns: prefix,label)
+
+    layout_k : float
+        Spring layout k parameter (default: 2.0)
 
     Returns
     -------
@@ -237,14 +249,26 @@ def build_network(
     if strain_parser is None:
         strain_parser = lambda x: "_".join(x.split("_")[:2]) # default: speciesTag_ID_int
 
+    if isinstance(legend_labels, str):
+        df_labels = pd.read_csv(legend_labels)
+        if not {"prefix", "label"}.issubset(df_labels.columns):
+            raise ValueError("legend_labels CSV must contain 'prefix' and 'label' columns")
+        label_map = dict(zip(df_labels["prefix"], df_labels["label"]))
+    elif isinstance(legend_labels, dict):
+        label_map = legend_labels
+    else:
+        label_map = None
+
     # ---------- Filter BLAST ----------
     print('-'*50)
     print("Building spacer sharing network...")
-    print(f"Filtering BLAST results with {net_perc_identity}% identity and {min_length} bp length thresholds...")
+    print(f"Filtering BLAST results with {net_perc_id}% identity and {min_length} bp length thresholds...")
+    
     df = blast_df.copy()
-
     df = df[
-    (df["length"] >= min_length) & (df["pident"] >= net_perc_identity)
+    (df["length"] >= min_length) & 
+    (df["pident"] >= net_perc_id &
+    (df["qseqid"] != df["sseqid"]))
     ]
     print(f"Number of hits after filtering: {len(df)}")
 
@@ -255,18 +279,21 @@ def build_network(
     # ---------- Build edge table ----------
     edges = df.groupby(["strain1", "strain2"]).size().reset_index(name="weight")
 
+    # ---------- Filter edges by weight ----------
+    if min_edge_weight > 1:
+        edges = edges[edges["weight"] >= min_edge_weight]
+        print(f"Edges after filtering (>= {min_edge_weight}): {len(edges)}")
+
     # Save edges if requested
     if save_edges:
         edges.to_csv(save_edges, index=False)
 
-    # ---------- Optional filtering ----------
-    if remove_singletons:
-        edges = edges[edges["weight"] > 1]
-
     # ---------- Determine nodes ----------
     if remove_singletons:
+        # Only keep nodes that still have edges
         strains = set(edges["strain1"]) | set(edges["strain2"])
     else:
+        # Keep all strains from original BLAST results
         strains = set(blast_df["qseqid"].apply(strain_parser)) | \
                   set(blast_df["sseqid"].apply(strain_parser))
 
@@ -337,7 +364,7 @@ def build_network(
             G, pos,
             node_color=node_colors,
             node_size=600,
-            alpha=0.9
+            alpha=0.95
         )
 
         nx.draw_networkx_edges(
@@ -354,11 +381,15 @@ def build_network(
             font_color="black"
         )
 
-        # Legend (auto-generated from color_map)
-        legend_handles = [
-            mpatches.Patch(color=color, label=group)
-            for group, color in group_to_color.items()
-        ]
+        # Legend (auto-generated from color_map or species prefixes)
+        legend_handles = []
+        for group, color in group_to_color.items():
+            if label_map and group in label_map:
+                label = label_map[group]
+            else:
+                label = group
+            legend_handles.append(mpatches.Patch(color=color, label=label))
+       
         plt.legend(handles=legend_handles, loc="upper right",
                    frameon=False, fontsize=8)
 
@@ -384,7 +415,7 @@ if __name__ == "__main__":
         description="Build spacer-sharing networks from CRISPR GFF files"
     )
 
-    # ---------- Required args ----------
+    # ---------- Required arguments ----------
     parser.add_argument(
         "input_file",
         help="Input GFF file containing CRISPR arrays", 
@@ -395,7 +426,7 @@ if __name__ == "__main__":
         help="Prefix for all output files"
     )
 
-    # ---------- Optional ars ----------
+    # ---------- Optional arguments ----------
     parser.add_argument(
         "--min_spacers",
         type=int,
@@ -427,7 +458,14 @@ if __name__ == "__main__":
     parser.add_argument(
         "--remove_singletons",
         action="store_true",
-        help="Remove singleton edges (weight = 1)"
+        help="Remove singleton nodes with no edges (default: False)"
+    )
+
+    parser.add_argument(
+        "--min_edge_weight",    
+        type=int,
+        default=1,
+        help="Minimum shared spacers required to retain an edge (default: 1)"
     )
 
     parser.add_argument(
@@ -437,19 +475,45 @@ if __name__ == "__main__":
         help="Minimum alignment length for network edges (default: 20)"
     )
 
+    parser.add_argument(
+        "--network_mode",
+        action="store_true",
+        help="Use only the plotting feature by inputing pre-run BLAST results (default: False)"
+    )
+
+    parser.add_argument(
+        "--legend_labels",
+        type= str,
+        default=None,
+        help="Optional CSV file mapping species prefixes to display labels (columns: prefix,label)"
+    )
+
+    parser.add_argument(
+        "--layout_k",
+        type=float,
+        default=2.0,
+        help="Spring layout k parameter (default: 2.0)"
+    )
+
     args = parser.parse_args()
 
-    # ---------- Extract spacers to FASTA ----------
-    fasta_output_file = args.output_prefix + "_spacers.fasta"
-    gff_to_fasta(args.input_file, fasta_output_file, args.min_spacers)
-    print(f"Spacer FASTA file created: {fasta_output_file}.")
-    print('-' * 50)
+    if args.network_mode:
+        if not args.input_file.endswith(".csv"):
+            raise ValueError("In network_mode, input_file must be a BLAST CSV")
+        print("Network mode enabled: Skipping spacer extraction and BLAST, using pre-run BLAST results.")
+        blast_df = pd.read_csv(args.input_file)
+    else:
+        # ---------- Extract spacers to FASTA ----------
+        fasta_output_file = args.output_prefix + "_spacers.fasta"
+        gff_to_fasta(args.input_file, fasta_output_file, args.min_spacers)
+        print(f"Spacer FASTA file created: {fasta_output_file}.")
+        print('-' * 50)
 
-    # ---------- Run BLAST ----------
-    blast_df = run_blast(fasta_output_file, args.blast_perc_id, args.output_prefix)
-    blast_df.to_csv(f"{args.output_prefix}_blast.csv", index=False)
-    print(f"BLAST completed and results saved to {args.output_prefix}_blast.csv")
-    print('-' * 50)
+        # ---------- Run BLAST ----------
+        blast_df = run_blast(fasta_output_file, args.blast_perc_id, args.output_prefix)
+        blast_df.to_csv(f"{args.output_prefix}_blast.csv", index=False)
+        print(f"BLAST completed and results saved to {args.output_prefix}_blast.csv")
+        print('-' * 50)
 
     # ---------- Build network ----------
     G, edges = build_network(
@@ -457,16 +521,15 @@ if __name__ == "__main__":
         net_perc_id=args.net_perc_id,
         min_length=args.net_min_length,
         remove_singletons=args.remove_singletons,
+        min_edge_weight=args.min_edge_weight,
         save_edges=f"{args.output_prefix}_edges.csv",
         output_figure=f"{args.output_prefix}_network.png",
         node_color_mode=args.node_color_mode,
-        color_map = None  # can be set for custom color dictionary
+        color_map = None,
+        legend_labels= args.legend_labels,
+        layout_k=args.layout_k
     )
-
     print(f"Network built and figure saved to {args.output_prefix}_network.png")
     print(f"Edges saved to {args.output_prefix}_edges.csv")
     print('**DONE**')
     print('-' * 50)
-
-
-
