@@ -1,5 +1,5 @@
-# spacerNet
-**spacerNet** is a tool designed to identify and visualize the shared spacer elements between the CRISPRs of multiple bacterial strains.
+# SpacerNet
+**SpacerNet** is a tool designed to identify and visualize the shared spacer elements between the CRISPRs of multiple bacterial strains.
 
 ### Input File:
 > spacerNet requires a combined multi-strain (or species) .GFF file containing CRISPR arrays annotated by CRISPRCasFinder.
