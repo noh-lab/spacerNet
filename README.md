@@ -14,7 +14,7 @@
 > NOTE: Depending on how CRISPRCasFinder parses the input genome file, these strain labels may need to be manually changed to reflect the above format. 
 
 
-### Command Format
+### Command Line Format
 **Minimal command format:**
 
 `python spacerNet.py input_file output_prefix`
